@@ -4,7 +4,7 @@ namespace MTPP3;
 
 public class Program
 {
-    public static void Main()
+    public static async Task Main()
     {
         var n = int.Parse(ReadNamed("N"));
         var k = int.Parse(ReadNamed("K"));
@@ -16,6 +16,7 @@ public class Program
         var particlesPositions = Enumerable.Repeat(0, k).ToArray();
 
         Action<int, int, double, Crystal> func;
+        Action<Crystal> additionalAction = null;
 
         if (mode == 1)
         {
@@ -32,6 +33,20 @@ public class Program
                     for (var tick = 0; tick < ticks; ++tick)
                     {
                         curPos = Helper.ParticleTick(curPos, last, p, crystal);
+                        Thread.Sleep(delay);
+                    }
+                };
+
+            additionalAction =
+                (crystal) =>
+                {
+                    for (var tick = 0; tick < ticks; ++tick)
+                    {
+                        lock (crystal.LockObj)
+                        {
+                            Console.WriteLine(string.Join(' ', crystal.Data));
+                        }
+
                         Thread.Sleep(delay);
                     }
                 };
@@ -58,15 +73,14 @@ public class Program
 
         var sw = Stopwatch.StartNew();
 
-        Parallel.ForEach
-        (
-            particlesPositions,
-            parallelOpts,
-            particlesPosition =>
-            {
-                func(particlesPosition, last, p, crystal);
-            }
-        );
+        var tasks = particlesPositions.Select(particlesPosition => Task.Run(() => func(particlesPosition, last, p, crystal)));
+
+        if (additionalAction != null)
+        {
+            tasks = new[] { Task.Run(() => additionalAction(crystal)) }.Concat(tasks);
+        }
+
+        await Task.WhenAll(tasks);
 
         sw.Stop();
 
