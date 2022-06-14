@@ -1,0 +1,68 @@
+﻿@using BlazorAuth.Components.Bases
+@using MTPP5.Data.Entities
+@using Microsoft.EntityFrameworkCore
+
+@inherits AuthComponentBase
+
+<div class="p-2 d-flex flex-column" style="border: 1px solid black;">
+    <div>
+        AVAILABLE ROOMS
+    </div>
+    <div>
+        @if (rooms == null)
+        {
+            <div>Loading rooms</div>
+        }
+        else
+        {
+            @if (rooms.Count == 0)
+            {
+                <div>Not found</div>
+            }
+            else
+            {
+                @foreach (var room in rooms)
+                {
+                    <div>@room.Name</div>
+                    <button @onclick="@(_ => OpenChat(room.Id))">Open chat</button>
+                }
+            }
+        }
+    </div>
+</div>
+
+@code
+{
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    private List<Room> rooms = null;
+
+    protected override async Task OnComponentInitializedAsync()
+    {
+        await base.OnComponentInitializedAsync();
+
+        using var db = await ApplicationDbContextFactory.CreateDbContextAsync();
+
+        var openRooms =
+            await db.Rooms
+                .AsNoTracking()
+                .Where(x => !x.IsClosed)
+                .ToListAsync();
+
+        var closedRooms =
+            await db.UsersRooms
+                .AsNoTracking()
+                .Where(x => x.UserId == User.Id)
+                .Include(x => x.Room)
+                .Select(x => x.Room)
+                .ToListAsync();
+
+        rooms = openRooms.Concat(closedRooms).ToList();
+    }
+
+    private void OpenChat(int roomId)
+    {
+        NavigationManager.NavigateTo($"/roomchat/{roomId}");
+    }
+}

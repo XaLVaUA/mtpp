@@ -1,0 +1,68 @@
+﻿@using BlazorAuth.Components.Bases
+@using MTPP5.Data.Entities
+@using Microsoft.EntityFrameworkCore
+
+@inherits AuthComponentBase
+
+<div class="p-2 d-flex flex-column" style="border: 1px solid black;">
+    <div>
+        USERS
+    </div>
+    <div>
+        @if (users == null)
+        {
+            <div>Loading users</div>
+        }
+        else
+        {
+            @if (users.Count == 0)
+            {
+                <div>Not found</div>
+            }
+            else
+            {
+                @foreach (var user in users)
+                {
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>@user.UserName</div>
+                        <div>
+                            <button @onclick="@(async _ => await CreateRoomAsync(user))">Create room</button>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </div>
+</div>
+
+@code
+{
+    private List<User> users = null;
+
+    protected override async Task OnComponentInitializedAsync()
+    {
+        await base.OnComponentInitializedAsync();
+
+        using var db = await ApplicationDbContextFactory.CreateDbContextAsync();
+
+        users = await db.Users.AsNoTracking().Where(x => x.Id != User.Id).ToListAsync();
+    }
+
+    private async Task CreateRoomAsync(User user)
+    {
+        using var db = await ApplicationDbContextFactory.CreateDbContextAsync();
+
+        var roomName = $"{User.UserName} - {user.UserName}";
+
+        if (await db.Rooms.AnyAsync(x => x.Name == roomName))
+        {
+            return;
+        }
+
+        var roomEntry = await db.Rooms.AddAsync(new Room { Name = roomName, IsClosed = true });
+        await db.SaveChangesAsync();
+        await db.UsersRooms.AddAsync(new UserRoom { UserId = User.Id, RoomId = roomEntry.Entity.Id });
+        await db.UsersRooms.AddAsync(new UserRoom { UserId = user.Id, RoomId = roomEntry.Entity.Id });
+        await db.SaveChangesAsync();
+    }
+}

@@ -1,0 +1,60 @@
+﻿@using BlazorAuth.Components.Bases
+@using MTPP5.Data.Entities
+
+@inherits AuthComponentBase
+
+<div>
+    <div>Room creation</div>
+    <div>
+        <span>Name</span>
+        <input @bind-value="@name" />
+    </div>
+    <div>
+        <span>Is closed</span>
+        <input type="checkbox" @bind-value="@isClosed" />
+    </div>
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div>@error</div>
+    }
+    <div>
+        <button @onclick="@CreateAsync">Create</button>
+    </div>
+</div>
+
+@code
+{
+    private string name = string.Empty;
+    private bool isClosed;
+    private string error = string.Empty;
+
+    private async Task CreateAsync()
+    {
+        if (!Validate())
+        {
+            return;
+        }
+
+        using var db = await ApplicationDbContextFactory.CreateDbContextAsync();
+
+        var roomEntry = await db.Rooms.AddAsync(new Room { Name = name, IsClosed = isClosed });
+        await db.SaveChangesAsync();
+        await db.UsersRooms.AddAsync(new UserRoom { UserId = User.Id, RoomId = roomEntry.Entity.Id });
+        await db.SaveChangesAsync();
+
+        name = string.Empty;
+        isClosed = false;
+    }
+
+    private bool Validate()
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            error = "Name could not be empty";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+}

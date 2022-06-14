@@ -1,0 +1,221 @@
+﻿@page "/roomchat/{RoomId:int}"
+
+@using BlazorAuth.Components.Bases
+@using MTPP5.Data.Entities
+@using MTPP5.Hubs
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.EntityFrameworkCore
+
+@implements IAsyncDisposable
+
+@inherits AuthComponentBase
+
+@if (room != null && room.IsClosed)
+{
+    <div>
+        <div>Invite user</div>
+        <div>
+            <span>User name (email)</span>
+            <input @bind-value="@inviteUserName" />
+        </div>
+        <div>
+            <button @onclick="@InviteUser">Invite</button>
+        </div>
+    </div>
+}
+<div>
+    <div>USERS</div>
+    <div>
+        @foreach (var user in users.Values)
+        {
+            <div>@user.UserName</div>
+        }
+    </div>
+</div>
+<div>
+    <div>MESSAGES</div>
+    <div>
+        @foreach (var message in messages)
+        {
+            <div class="p-2" style="border: 1px solid black;">
+                <div><span>Send by: </span>@message?.User?.UserName</div>
+                <div>@message?.Content</div>
+            </div>
+        }
+    </div>
+</div>
+<div>
+    <div>
+        <div>
+            <input @bind-value="@messageContent" />
+        </div>
+        <div>
+            <button @onclick="@(async _ => await SendMessage())">Send</button>
+        </div>
+    </div>
+</div>
+
+@code
+{
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    [Parameter]
+    public int RoomId { get; set; }
+
+    private string messageContent = string.Empty;
+
+    private string inviteUserName = string.Empty;
+
+    private Room room;
+    private HubConnection hubConnection;
+    private List<Message> messages = new();
+    private Dictionary<string, User> users = new();
+
+    protected override async Task OnComponentInitializedAsync()
+    {
+        await base.OnComponentInitializedAsync();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri(AppHub.Route))
+            .Build();
+
+        hubConnection.On<Message>
+        (
+            AppHub.ReceiveMessageMethodName, (message) =>
+            {
+                if (message == null || message.UserId == User.Id)
+                {
+                    return;
+                }
+
+                messages.Add(message);
+                InvokeAsync(StateHasChanged);
+            }
+        );
+
+        hubConnection.On<string, User>
+        (
+            AppHub.RoomJoinMethodName, async (connectionId, user) =>
+            {
+                if (string.IsNullOrEmpty(connectionId) || user == null || user.Id == User.Id)
+                {
+                    return;
+                }
+
+                await hubConnection.SendAsync(nameof(AppHub.JoinRoomResponse), User, connectionId);
+
+                users.TryAdd(user.UserName, user);
+                InvokeAsync(StateHasChanged);
+            }
+        );
+
+        hubConnection.On<User>
+        (
+            AppHub.RoomJoinResponseMethodName, async (user) =>
+            {
+                if (user == null || user.Id == User.Id)
+                {
+                    return;
+                }
+
+                users.TryAdd(user.UserName, user);
+                InvokeAsync(StateHasChanged);
+            }
+        );
+
+        hubConnection.On<User>
+        (
+            AppHub.RoomLeaveMethodName, (user) =>
+            {
+                if (user == null || user.Id == User.Id)
+                {
+                    return;
+                }
+
+                if (users.Remove(user.UserName))
+                {
+                    InvokeAsync(StateHasChanged);
+                }
+            }
+        );
+
+        using var db = await ApplicationDbContextFactory.CreateDbContextAsync();
+
+        room = db.Rooms.AsNoTracking().FirstOrDefault(x => x.Id == RoomId);
+
+        messages =
+            await db.Messages
+                .AsNoTracking()
+                .Where(x => x.RoomId == RoomId)
+                .Include(x => x.User)
+                .OrderBy(x => x.DateTime)
+                .ToListAsync();
+
+        await hubConnection.StartAsync();
+
+        await hubConnection.SendAsync(nameof(AppHub.JoinRoom), User, RoomId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync(nameof(AppHub.LeaveRoom), User, RoomId);
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrEmpty(messageContent))
+        {
+            return;
+        }
+
+        Message message;
+
+        using (var db = await ApplicationDbContextFactory.CreateDbContextAsync())
+        {
+            var messageEntry = await db.AddAsync(new Message { Content = messageContent, RoomId = RoomId, UserId = User.Id, DateTime = DateTime.UtcNow });
+            await db.SaveChangesAsync();
+            message = messageEntry.Entity;
+        }
+
+        message.User = User;
+
+        messages.Add(message);
+        messageContent = string.Empty;
+
+        InvokeAsync(StateHasChanged);
+
+        await hubConnection.SendAsync(nameof(AppHub.SendMessage), message);
+    }
+
+    private async Task InviteUser()
+    {
+        if (string.IsNullOrEmpty(inviteUserName))
+        {
+            return;
+        }
+
+        using var db = await ApplicationDbContextFactory.CreateDbContextAsync();
+
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.UserName == inviteUserName);
+
+        if (user == null)
+        {
+            return;
+        }
+
+        if (await db.UsersRooms.AnyAsync(x => x.RoomId == RoomId && x.UserId == user.Id))
+        {
+            return;
+        }
+
+        await db.UsersRooms.AddAsync(new UserRoom { RoomId = RoomId, UserId = user.Id });
+        await db.SaveChangesAsync();
+
+        inviteUserName = string.Empty;
+    }
+}
