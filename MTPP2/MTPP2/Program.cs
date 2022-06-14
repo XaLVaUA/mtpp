@@ -7,13 +7,13 @@ var inputs = new[] { 10, 50, 100, 200 }.Select(x => Enumerable.Range(0, x).Selec
 
 int F(int x)
 {
-    Thread.Sleep(10);
+    Thread.Sleep(1);
     return x + 5;
 }
 
 T WithDelay<T>(Func<T> func)
 {
-    Thread.Sleep(10);
+    Thread.Sleep(1);
     return func();
 }
 
