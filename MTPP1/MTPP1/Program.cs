@@ -9,6 +9,8 @@ internal static class Program
         var data = Enumerable.Range(0, 100).ToArray();
         var dataSourcesPaths = new[] {"data3_1.txt", "data3_2.txt", "data_3_3.txt"};
 
+        GenerateDataSources(data, dataSourcesPaths, data.Length, dataSourcesPaths.Length);
+
         var degreesOfParallelism = new[] {2, 3, 4};
         var stopwatch = new Stopwatch();
 
@@ -136,14 +138,14 @@ internal static class Program
     // simulate heavy calculation
     private static int CpuBoundCalculate(int x)
     {
-        Thread.Sleep(10);
+        Thread.Sleep(1);
         return Calculate(x);
     }
 
     // simulate slow memory
     private static T ReadMemoryBoundData<T>(T data)
     {
-        Thread.Sleep(10);
+        Thread.Sleep(1);
         return data;
     }
 
