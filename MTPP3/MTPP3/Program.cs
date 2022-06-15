@@ -71,14 +71,14 @@ public class Program
 
         var parallelOpts = new ParallelOptions { MaxDegreeOfParallelism = 4 };
 
-        var sw = Stopwatch.StartNew();
-
         var tasks = particlesPositions.Select(particlesPosition => Task.Run(() => func(particlesPosition, last, p, crystal)));
 
         if (additionalAction != null)
         {
             tasks = new[] { Task.Run(() => additionalAction(crystal)) }.Concat(tasks);
         }
+
+        var sw = Stopwatch.StartNew();
 
         await Task.WhenAll(tasks);
 
