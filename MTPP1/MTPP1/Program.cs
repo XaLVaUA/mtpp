@@ -11,7 +11,7 @@ internal static class Program
 
         GenerateDataSources(data, dataSourcesPaths, data.Length, dataSourcesPaths.Length);
 
-        var degreesOfParallelism = new[] {2, 3, 4};
+        var degreesOfParallelism = new[] {4, 8, 16, 64};
         var stopwatch = new Stopwatch();
 
         Console.WriteLine("Single thread");
@@ -138,14 +138,26 @@ internal static class Program
     // simulate heavy calculation
     private static int CpuBoundCalculate(int x)
     {
-        Thread.Sleep(1);
+        var result = 0d;
+
+        for (var i = 0; i < 10000000; ++i)
+        {
+            result += Math.Atan(i) / Math.Tan(i);
+        };
+
         return Calculate(x);
     }
 
     // simulate slow memory
     private static T ReadMemoryBoundData<T>(T data)
     {
-        Thread.Sleep(1);
+        var result = 0d;
+
+        for (var i = 0; i < 1000000; ++i)
+        {
+            result += Math.Atan(i) / Math.Tan(i);
+        };
+
         return data;
     }
 
