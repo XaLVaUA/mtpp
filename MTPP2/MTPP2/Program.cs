@@ -2,7 +2,7 @@
 
 var rnd = new Random();
 var sw = new Stopwatch();
-var threadsCounts = new[] { 2, 3, 4 };
+var threadsCounts = new[] { 2, 8, 16 };
 var inputs = new[] { 10, 50, 100, 200 }.Select(x => Enumerable.Range(0, x).Select(_ => rnd.Next(-100, 101)).ToArray()).ToArray();
 
 int F(int x)
