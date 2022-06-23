@@ -30,8 +30,15 @@ public class Program
                 {
                     var curPos = initialPos;
 
+                    var sw = Stopwatch.StartNew();
+
                     for (var tick = 0; tick < ticks; ++tick)
                     {
+                        if (sw.ElapsedMilliseconds > time)
+                        {
+                            break;
+                        }
+
                         curPos = Helper.ParticleTick(curPos, last, p, crystal);
                         Thread.Sleep(delay);
                     }
@@ -40,8 +47,15 @@ public class Program
             additionalAction =
                 (crystal) =>
                 {
+                    var sw = Stopwatch.StartNew();
+
                     for (var tick = 0; tick < ticks; ++tick)
                     {
+                        if (sw.ElapsedMilliseconds > time)
+                        {
+                            break;
+                        }
+
                         lock (crystal.LockObj)
                         {
                             Console.WriteLine(string.Join(' ', crystal.Data));
@@ -71,7 +85,9 @@ public class Program
 
         var parallelOpts = new ParallelOptions { MaxDegreeOfParallelism = 4 };
 
-        var tasks = particlesPositions.Select(particlesPosition => Task.Run(() => func(particlesPosition, last, p, crystal)));
+        var tasks =
+            particlesPositions
+                .Select(particlesPosition => Task.Run(() => func(particlesPosition, last, p, crystal)));
 
         if (additionalAction != null)
         {
